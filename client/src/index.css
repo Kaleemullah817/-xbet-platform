@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #0b1118;
+  color: #e4ecf5;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.font-gaming {
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+/* Custom Scrollbar for sleek 1xBet feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1622;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #233547;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0088cc;
+}
+
+@keyframes pulse-green {
+  0%, 100% { background-color: rgba(38, 166, 154, 0.2); }
+  50% { background-color: rgba(38, 166, 154, 0.6); }
+}
+
+@keyframes pulse-red {
+  0%, 100% { background-color: rgba(239, 83, 80, 0.2); }
+  50% { background-color: rgba(239, 83, 80, 0.6); }
+}
+
+.odds-up {
+  animation: pulse-green 1s ease-in-out;
+  color: #00e676 !important;
+}
+
+.odds-down {
+  animation: pulse-red 1s ease-in-out;
+  color: #ff5252 !important;
+}
