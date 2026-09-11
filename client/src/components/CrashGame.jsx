@@ -90,72 +90,300 @@ export default function CrashGame({ crashState, user, onUpdateUser }) {
   }, [crashState.multiplier, crashState.status]);
 
   // Canvas drawing for flight path
+  const crashStateRef = useRef(crashState);
+  crashStateRef.current = crashState;
+
+  // Helper to draw authentic red Aviator supersonic jet
+  const drawAviatorJet = (ctx, x, y, angle, isCrashed, tick, isIdle = false) => {
+    ctx.save();
+    ctx.translate(x, y);
+
+    if (isCrashed) {
+      // 💥 Dramatic Explosion Burst & Shockwave
+      ctx.save();
+      // Outer blast shockwave
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 36, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner fire shockwave
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Multi-pointed blast star
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      for (let i = 0; i < 12; i++) {
+        const r = i % 2 === 0 ? 30 : 13;
+        const a = (i * Math.PI) / 6;
+        const px = Math.cos(a) * r;
+        const py = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Core white flash
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Flying debris fragments
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(-20, -15, 8, 4);
+      ctx.fillRect(14, -18, 6, 6);
+      ctx.fillRect(16, 12, 7, 3);
+      ctx.fillRect(-15, 16, 6, 5);
+
+      ctx.restore();
+      ctx.restore();
+      return;
+    }
+
+    // Rotate plane along tangent flight climb angle
+    ctx.rotate(angle);
+
+    // Subtle idle engine vibration
+    if (isIdle) {
+      ctx.translate(0, Math.sin(tick * 0.3) * 1.5);
+    }
+
+    // 1. JET THRUSTER FLAME (Animated exhaust fire behind plane)
+    const flameLength = isIdle ? 10 : 26 + (Math.sin(tick * 0.45) * 8);
+    const flameGrad = ctx.createLinearGradient(0, 0, -flameLength, 0);
+    flameGrad.addColorStop(0, '#ffffff');
+    flameGrad.addColorStop(0.25, '#fef08a');
+    flameGrad.addColorStop(0.6, '#f97316');
+    flameGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+
+    ctx.beginPath();
+    ctx.moveTo(-18, -4);
+    ctx.quadraticCurveTo(-18 - flameLength * 0.7, 0, -18 - flameLength, 0);
+    ctx.quadraticCurveTo(-18 - flameLength * 0.7, 0, -18, 4);
+    ctx.closePath();
+    ctx.fillStyle = flameGrad;
+    ctx.shadowColor = '#f97316';
+    ctx.shadowBlur = isIdle ? 6 : 18;
+    ctx.fill();
+
+    // Reset shadow for aircraft body
+    ctx.shadowBlur = 0;
+
+    // 2. MAIN SWEPT DELTA WINGS
+    ctx.fillStyle = '#991b1b'; // Wing underside / base
+    ctx.beginPath();
+    ctx.moveTo(6, 0);
+    ctx.lineTo(-12, -24); // Upper wingtip
+    ctx.lineTo(-6, -24);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(-6, 24);
+    ctx.lineTo(-12, 24); // Lower wingtip
+    ctx.closePath();
+    ctx.fill();
+
+    // Upper wing aerodynamic top
+    const wingGrad = ctx.createLinearGradient(0, -24, 0, 24);
+    wingGrad.addColorStop(0, '#dc2626');
+    wingGrad.addColorStop(0.5, '#ef4444');
+    wingGrad.addColorStop(1, '#b91c1c');
+
+    ctx.fillStyle = wingGrad;
+    ctx.beginPath();
+    ctx.moveTo(10, 0);
+    ctx.lineTo(-10, -22);
+    ctx.lineTo(-5, -22);
+    ctx.lineTo(-2, 0);
+    ctx.lineTo(-5, 22);
+    ctx.lineTo(-10, 22);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wingtip White Racing Stripes
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-10, -22, 3, 5);
+    ctx.fillRect(-10, 17, 3, 5);
+
+    // 3. HORIZONTAL TAIL STABILIZERS
+    ctx.fillStyle = '#b91c1c';
+    ctx.beginPath();
+    ctx.moveTo(-15, 0);
+    ctx.lineTo(-24, -11);
+    ctx.lineTo(-20, -11);
+    ctx.lineTo(-13, 0);
+    ctx.lineTo(-20, 11);
+    ctx.lineTo(-24, 11);
+    ctx.closePath();
+    ctx.fill();
+
+    // 4. MAIN FUSELAGE (Red Supersonic Jet Body)
+    const bodyGrad = ctx.createLinearGradient(0, -8, 0, 8);
+    bodyGrad.addColorStop(0, '#f87171');
+    bodyGrad.addColorStop(0.3, '#dc2626');
+    bodyGrad.addColorStop(1, '#991b1b');
+
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(26, 0); // Sharp nose
+    ctx.bezierCurveTo(18, -7, 4, -8, -18, -6); // Upper fuselage curve
+    ctx.lineTo(-23, -3.5); // Exhaust nozzle
+    ctx.lineTo(-23, 3.5);
+    ctx.lineTo(-18, 6); // Lower fuselage curve
+    ctx.bezierCurveTo(4, 8, 18, 7, 26, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // White center aerodynamic racing line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(24, 0);
+    ctx.lineTo(-18, 0);
+    ctx.stroke();
+
+    // 5. VERTICAL TAIL FIN (Rudder)
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.moveTo(-12, -3);
+    ctx.lineTo(-24, -17);
+    ctx.lineTo(-19, -17);
+    ctx.lineTo(-15, -3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(-24, -17);
+    ctx.lineTo(-19, -17);
+    ctx.lineTo(-18, -13);
+    ctx.lineTo(-23, -13);
+    ctx.closePath();
+    ctx.fill();
+
+    // 6. COCKPIT CANOPY (Cyan Tinted Glass with Specular Glare)
+    ctx.fillStyle = '#0284c7';
+    ctx.beginPath();
+    ctx.ellipse(7, -2, 7.5, 3.8, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.ellipse(7, -2.5, 5.5, 2.2, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White gloss reflection
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.beginPath();
+    ctx.ellipse(8, -3.2, 3.2, 1.1, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 7. GOLD PROPELLER CONE & SPINNING BLADES
+    ctx.fillStyle = '#fbbf24'; // Golden spinner cone
+    ctx.beginPath();
+    ctx.arc(25, 0, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spinning propeller blur effect
+    const propAngle = (tick * 1.6) % Math.PI;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(27, -Math.sin(propAngle) * 14);
+    ctx.lineTo(27, Math.sin(propAngle) * 14);
+    ctx.stroke();
+
+    ctx.restore();
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const width = canvas.width = canvas.parentElement.clientWidth;
-    const height = canvas.height = canvas.parentElement.clientHeight;
+    let animId;
+    let tick = 0;
 
-    ctx.clearRect(0, 0, width, height);
+    const render = () => {
+      tick++;
+      const current = crashStateRef.current;
+      if (!canvas.parentElement) return;
 
-    // Draw grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < width; x += 60) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < height; y += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
+      const width = canvas.width = canvas.parentElement.clientWidth;
+      const height = canvas.height = canvas.parentElement.clientHeight;
 
-    if (crashState.status === 'FLYING' || crashState.status === 'CRASHED') {
-      const m = Math.min(crashState.multiplier, 15);
-      const progress = Math.min(1, (m - 1.0) / 7.0);
-      
-      const startX = 40;
-      const startY = height - 40;
-      const endX = startX + (width - 120) * progress;
-      const endY = startY - (height - 100) * Math.pow(progress, 0.85);
+      ctx.clearRect(0, 0, width, height);
 
-      // Draw curved flight trajectory
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.quadraticCurveTo(startX + (endX - startX) * 0.4, startY, endX, endY);
-      ctx.strokeStyle = crashState.status === 'CRASHED' ? '#ef4444' : '#00e676';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Draw glowing gradient fill under curve
-      const gradient = ctx.createLinearGradient(0, endY, 0, startY);
-      if (crashState.status === 'CRASHED') {
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.25)');
-        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
-      } else {
-        gradient.addColorStop(0, 'rgba(0, 230, 118, 0.25)');
-        gradient.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
+      // Draw grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width; x += 60) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
       }
-      ctx.lineTo(endX, startY);
-      ctx.lineTo(startX, startY);
-      ctx.fillStyle = gradient;
-      ctx.fill();
+      for (let y = 0; y < height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
 
-      // Draw Plane Icon at end position
-      ctx.save();
-      ctx.translate(endX, endY);
-      ctx.fillStyle = crashState.status === 'CRASHED' ? '#ef4444' : '#ffffff';
-      ctx.beginPath();
-      ctx.arc(0, 0, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }, [crashState.multiplier, crashState.status]);
+      const startX = 50;
+      const startY = height - 50;
+
+      if (current.status === 'STARTING') {
+        // Red Plane idling on the runway tarmac waiting for takeoff
+        drawAviatorJet(ctx, startX + 20, startY - 10, -0.05, false, tick, true);
+      } else if (current.status === 'FLYING' || current.status === 'CRASHED') {
+        const m = Math.min(current.multiplier || 1.0, 15);
+        const progress = Math.min(1, (m - 1.0) / 7.0);
+
+        const endX = startX + (width - 140) * progress;
+        const endY = startY - (height - 110) * Math.pow(progress, 0.85);
+
+        // Tangent climb angle for plane nose
+        const dx = Math.max(1, 0.6 * (endX - startX));
+        const dy = endY - startY;
+        const angle = Math.atan2(dy, dx);
+
+        // Curved flight trajectory
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.quadraticCurveTo(startX + (endX - startX) * 0.4, startY, endX, endY);
+        ctx.strokeStyle = current.status === 'CRASHED' ? '#ef4444' : '#00e676';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Glowing gradient fill under curve
+        const gradient = ctx.createLinearGradient(0, endY, 0, startY);
+        if (current.status === 'CRASHED') {
+          gradient.addColorStop(0, 'rgba(239, 68, 68, 0.28)');
+          gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+        } else {
+          gradient.addColorStop(0, 'rgba(0, 230, 118, 0.28)');
+          gradient.addColorStop(1, 'rgba(0, 230, 118, 0.0)');
+        }
+        ctx.lineTo(endX, startY);
+        ctx.lineTo(startX, startY);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw the iconic red Aviator supersonic jet plane!
+        drawAviatorJet(ctx, endX, endY, angle, current.status === 'CRASHED', tick, false);
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto space-y-4">
