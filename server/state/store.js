@@ -69,6 +69,7 @@ class AppState {
     };
 
     this.depositRequests = [];
+    this.withdrawalRequests = [];
 
     this.matches = [
       {
@@ -412,6 +413,7 @@ class AppState {
         users: this.users,
         transactions: this.transactions,
         depositRequests: this.depositRequests,
+        withdrawalRequests: this.withdrawalRequests,
         adminPaymentAccounts: this.adminPaymentAccounts,
         bets: this.bets
       };
@@ -429,6 +431,7 @@ class AppState {
         if (Array.isArray(data.users) && data.users.length > 0) this.users = data.users;
         if (Array.isArray(data.transactions)) this.transactions = data.transactions;
         if (Array.isArray(data.depositRequests)) this.depositRequests = data.depositRequests;
+        if (Array.isArray(data.withdrawalRequests)) this.withdrawalRequests = data.withdrawalRequests;
         if (data.adminPaymentAccounts) this.adminPaymentAccounts = data.adminPaymentAccounts;
         if (Array.isArray(data.bets)) this.bets = data.bets;
         console.log(`[Store] Successfully loaded ${this.users.length} users and state from ${DATA_FILE}`);
@@ -721,6 +724,70 @@ class AppState {
     this.saveToFile();
 
     return { request: req };
+  }
+
+  addWithdrawalRequest(reqData) {
+    const user = this.getUser(reqData.userId);
+    if (!user) throw new Error('User not found');
+    const amount = Number(reqData.amount);
+    if (isNaN(amount) || amount <= 0) throw new Error('Invalid withdrawal amount');
+    if (user.balance < amount) throw new Error('Insufficient balance in wallet');
+
+    // Deduct from balance immediately to prevent double spending
+    this.updateBalance(-amount, user.id);
+
+    const req = {
+      id: 'wdr_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      userId: user.id,
+      username: user.username,
+      amount: amount,
+      method: reqData.method || 'EasyPaisa',
+      accountNumber: reqData.accountNumber,
+      accountTitle: reqData.accountTitle,
+      status: 'IN_REVIEW', // IN_REVIEW, APPROVED, REJECTED
+      createdAt: Date.now(),
+      processedAt: null,
+      notes: 'Withdraw in review contact on 03177229994 whatsapp'
+    };
+
+    this.withdrawalRequests.unshift(req);
+    this.addTransaction('WITHDRAW_HOLD', `${req.method} (${req.accountNumber})`, -amount);
+    this.saveToFile();
+    return req;
+  }
+
+  getWithdrawalRequests(userId = null) {
+    if (userId) {
+      return this.withdrawalRequests.filter(r => r.userId === userId);
+    }
+    return this.withdrawalRequests;
+  }
+
+  approveWithdrawalRequest(requestId) {
+    const req = this.withdrawalRequests.find(r => r.id === requestId);
+    if (!req || req.status !== 'IN_REVIEW') return null;
+
+    req.status = 'APPROVED';
+    req.processedAt = Date.now();
+    req.notes = 'Approved & Dispatched via WhatsApp';
+    this.addTransaction('WITHDRAWAL', `${req.method} Paid to ${req.accountNumber}`, -req.amount);
+    this.saveToFile();
+    return { request: req, user: this.getUser(req.userId) };
+  }
+
+  rejectWithdrawalRequest(requestId, reason = 'Rejected by Admin - Funds Refunded') {
+    const req = this.withdrawalRequests.find(r => r.id === requestId);
+    if (!req || req.status !== 'IN_REVIEW') return null;
+
+    req.status = 'REJECTED';
+    req.processedAt = Date.now();
+    req.notes = reason;
+
+    // Refund back to user's wallet
+    this.updateBalance(req.amount, req.userId);
+    this.addTransaction('REFUND', `Withdrawal Refund (${req.id})`, req.amount);
+    this.saveToFile();
+    return { request: req, newBalance: this.getUser(req.userId).balance };
   }
 }
 

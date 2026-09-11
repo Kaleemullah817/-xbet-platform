@@ -323,6 +323,106 @@ export function createApiRouter(io) {
     });
   });
 
+  // 1i. Submit Withdrawal Request (Cashout)
+  router.post('/wallet/withdraw-request', (req, res) => {
+    const { amount, method, accountNumber, accountTitle } = req.body;
+    const activeUserId = req.headers['x-user-id'] || req.body.userId || state.currentUserId;
+    const numAmount = parseFloat(amount);
+
+    if (!numAmount || numAmount < 100) {
+      return res.status(400).json({ error: 'Minimum withdrawal amount is 100 PKR' });
+    }
+    if (!accountNumber || accountNumber.trim().length < 8) {
+      return res.status(400).json({ error: 'Please enter a valid mobile / bank account number' });
+    }
+    if (!accountTitle || accountTitle.trim().length < 2) {
+      return res.status(400).json({ error: 'Please enter the Account Title (Name)' });
+    }
+
+    try {
+      const request = state.addWithdrawalRequest({
+        userId: activeUserId,
+        amount: numAmount,
+        method: method || 'EasyPaisa',
+        accountNumber: accountNumber.trim(),
+        accountTitle: accountTitle.trim()
+      });
+
+      // Broadcast user update & withdrawal update
+      const updatedUser = state.getUser(activeUserId);
+      io.emit('user_update', updatedUser);
+      io.emit('new_withdrawal_request', request);
+      io.emit('withdrawal_requests_update', state.getWithdrawalRequests());
+
+      res.json({
+        success: true,
+        message: 'Withdraw in review contact on 03177229994 whatsapp',
+        whatsappPrompt: 'Withdraw in review contact on 03177229994 whatsapp',
+        whatsappNumber: '03177229994',
+        whatsappLink: `https://wa.me/923177229994?text=${encodeURIComponent(
+          `Salam Admin! Maine 1X-BET se ${numAmount} PKR ka withdrawal request bheja hai.\nUser: ${updatedUser.username}\nAccount: ${accountNumber} (${accountTitle})\nMethod: ${method || 'EasyPaisa'}\nReq ID: ${request.id}\nPlease approve.`
+        )}`,
+        request,
+        newBalance: updatedUser.balance
+      });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 1j. Get user's withdrawal requests
+  router.get('/wallet/my-withdrawals', (req, res) => {
+    const activeUserId = req.headers['x-user-id'] || state.currentUserId;
+    const all = state.getWithdrawalRequests(activeUserId);
+    res.json(all);
+  });
+
+  // 1k. Admin: Get all withdrawal requests
+  router.get('/admin/withdrawal-requests', (req, res) => {
+    res.json(state.getWithdrawalRequests());
+  });
+
+  // 1l. Admin: Approve withdrawal request
+  router.post('/admin/withdrawal-requests/approve', (req, res) => {
+    const { requestId } = req.body;
+    const result = state.approveWithdrawalRequest(requestId);
+    if (!result) {
+      return res.status(400).json({ error: 'Request not found or already processed' });
+    }
+
+    io.emit('withdrawal_requests_update', state.getWithdrawalRequests());
+    if (result.user) {
+      io.emit('user_update', result.user);
+    }
+
+    res.json({
+      success: true,
+      message: `Withdrawal #${requestId} approved and marked paid!`,
+      result
+    });
+  });
+
+  // 1m. Admin: Reject withdrawal request & refund balance
+  router.post('/admin/withdrawal-requests/reject', (req, res) => {
+    const { requestId, reason } = req.body;
+    const result = state.rejectWithdrawalRequest(requestId, reason || 'Withdrawal rejected - amount refunded');
+    if (!result) {
+      return res.status(400).json({ error: 'Request not found or already processed' });
+    }
+
+    io.emit('withdrawal_requests_update', state.getWithdrawalRequests());
+    const user = state.getUser(result.request.userId);
+    if (user) {
+      io.emit('user_update', user);
+    }
+
+    res.json({
+      success: true,
+      message: `Withdrawal #${requestId} rejected and ${result.request.amount} PKR refunded to player balance.`,
+      result
+    });
+  });
+
   // 1h. Admin: Update payment accounts (EasyPaisa/JazzCash numbers)
   router.post('/admin/payment-accounts', (req, res) => {
     const { accounts } = req.body;

@@ -27,13 +27,17 @@ import {
   Filter,
   Sparkles,
   Shield,
-  Lock
+  Lock,
+  ArrowUpCircle,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches = [], onUpdateMatches, user, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('deposits'); // 'deposits' | 'live_bets' | 'accounts' | 'matches' | 'users' | 'otps' | 'crash'
   const [depositRequests, setDepositRequests] = useState([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [otpLogs, setOtpLogs] = useState([]);
   const [crashSlots, setCrashSlots] = useState(Array(10).fill(''));
@@ -79,6 +83,7 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
 
   useEffect(() => {
     fetchRequests();
+    fetchWithdrawalRequests();
     fetchAccounts();
     fetchUsers();
     fetchCrashSlots();
@@ -97,11 +102,22 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
         setLiveBets(updatedBets);
       }
     };
+    const handleWithdrawalsSync = (updatedWithdrawals) => {
+      if (Array.isArray(updatedWithdrawals)) {
+        setWithdrawalRequests(updatedWithdrawals);
+      }
+    };
     socket.on('crash_slots_update', handleSlotsSync);
     socket.on('admin_live_bets_update', handleLiveBetsSync);
+    socket.on('withdrawal_requests_update', handleWithdrawalsSync);
+    socket.on('new_withdrawal_request', () => {
+      fetchWithdrawalRequests();
+      setNotification({ type: 'info', text: '💸 New Withdrawal Request Received!' });
+    });
     return () => {
       socket.off('crash_slots_update', handleSlotsSync);
       socket.off('admin_live_bets_update', handleLiveBetsSync);
+      socket.off('withdrawal_requests_update', handleWithdrawalsSync);
     };
   }, [socket]);
 
@@ -251,6 +267,53 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
     }
   };
 
+  const fetchWithdrawalRequests = () => {
+    fetch('/api/admin/withdrawal-requests')
+      .then(res => res.json())
+      .then(data => setWithdrawalRequests(Array.isArray(data) ? data : []))
+      .catch(err => console.error(err));
+  };
+
+  const handleApproveWithdrawal = async (requestId) => {
+    try {
+      const res = await fetch('/api/admin/withdrawal-requests/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Approval failed');
+
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
+      setNotification({ type: 'success', text: data.message });
+      fetchWithdrawalRequests();
+      if (onUpdateUser) onUpdateUser();
+    } catch (err) {
+      setNotification({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleRejectWithdrawal = async (requestId) => {
+    const reason = prompt('Enter reason for withdrawal rejection (funds will be refunded to user):', 'Incorrect Account Details / Review Mismatch');
+    if (!reason) return;
+
+    try {
+      const res = await fetch('/api/admin/withdrawal-requests/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Rejection failed');
+
+      setNotification({ type: 'info', text: data.message });
+      fetchWithdrawalRequests();
+      if (onUpdateUser) onUpdateUser();
+    } catch (err) {
+      setNotification({ type: 'error', text: err.message });
+    }
+  };
+
   const handleSaveAccounts = async () => {
     try {
       const res = await fetch('/api/admin/payment-accounts', {
@@ -349,6 +412,9 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
   const pendingDeposits = depositRequests.filter(r => r.status === 'PENDING');
   const approvedDeposits = depositRequests.filter(r => r.status === 'APPROVED');
   const totalApprovedAmount = approvedDeposits.reduce((acc, r) => acc + (r.amount || 0), 0);
+  const pendingWithdrawals = withdrawalRequests.filter(r => r.status === 'IN_REVIEW');
+  const approvedWithdrawals = withdrawalRequests.filter(r => r.status === 'APPROVED');
+  const totalApprovedWithdrawalAmount = approvedWithdrawals.reduce((acc, r) => acc + (r.amount || 0), 0);
   const selectedMatch = matches.find(m => m.id === selectedMatchId) || matches[0];
 
   return (
@@ -419,6 +485,26 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
               {pendingDeposits.length > 0 && (
                 <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center animate-bounce">
                   {pendingDeposits.length}
+                </span>
+              )}
+            </button>
+
+            {/* Withdrawals Approval Queue */}
+            <button
+              onClick={() => { setActiveTab('withdrawals'); setNotification(null); fetchWithdrawalRequests(); }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'withdrawals'
+                  ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white shadow-lg shadow-amber-600/30'
+                  : 'text-gray-300 hover:bg-[#121e2d] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <ArrowUpCircle className="w-4 h-4 text-amber-400" />
+                <span>Withdrawal Queue</span>
+              </div>
+              {pendingWithdrawals.length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-amber-400 text-black text-[10px] font-black flex items-center justify-center animate-bounce shadow">
+                  {pendingWithdrawals.length}
                 </span>
               )}
             </button>
@@ -524,46 +610,56 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
           )}
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-[#0e1824] border border-[#1a2d42] p-4 rounded-2xl flex items-center justify-between shadow-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="bg-[#0e1824] border border-[#1a2d42] p-3.5 rounded-2xl flex items-center justify-between shadow-md">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Pending Approvals</span>
-                <div className="text-2xl font-black text-amber-400 font-gaming mt-0.5">{pendingDeposits.length}</div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pending Deposits</span>
+                <div className="text-xl font-black text-amber-400 font-gaming mt-0.5">{pendingDeposits.length}</div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <Clock className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="bg-[#0e1824] border border-[#1a2d42] p-4 rounded-2xl flex items-center justify-between shadow-md">
+            <div className="bg-[#0e1824] border border-amber-500/30 p-3.5 rounded-2xl flex items-center justify-between shadow-md">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Approved Deposits</span>
-                <div className="text-2xl font-black text-emerald-400 font-gaming mt-0.5">{totalApprovedAmount.toLocaleString()} PKR</div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Pending Cashouts</span>
+                <div className="text-xl font-black text-amber-300 font-gaming mt-0.5">{pendingWithdrawals.length}</div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <ArrowUpCircle className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="bg-[#0e1824] border border-[#1a2d42] p-4 rounded-2xl flex items-center justify-between shadow-md">
+            <div className="bg-[#0e1824] border border-[#1a2d42] p-3.5 rounded-2xl flex items-center justify-between shadow-md">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Player Balance</span>
-                <div className="text-2xl font-black text-cyan-400 font-gaming mt-0.5">{user?.balance?.toLocaleString()} PKR</div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Approved Deposits</span>
+                <div className="text-xl font-black text-emerald-400 font-gaming mt-0.5">{totalApprovedAmount.toLocaleString()} PKR</div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                <DollarSign className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <CheckCircle className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="bg-[#0e1824] border border-[#1a2d42] p-4 rounded-2xl flex items-center justify-between shadow-md">
+            <div className="bg-[#0e1824] border border-[#1a2d42] p-3.5 rounded-2xl flex items-center justify-between shadow-md">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Live In-Play Bets</span>
-                <div className="text-2xl font-black text-emerald-400 font-gaming mt-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Player Balance</span>
+                <div className="text-xl font-black text-cyan-400 font-gaming mt-0.5">{user?.balance?.toLocaleString()} PKR</div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#0e1824] border border-[#1a2d42] p-3.5 rounded-2xl flex items-center justify-between shadow-md">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">In-Play Bets</span>
+                <div className="text-xl font-black text-emerald-400 font-gaming mt-0.5">
                   {liveBets.filter(b => b.status === 'ACTIVE').length} Active
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Activity className="w-5 h-5 animate-pulse" />
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <Activity className="w-4 h-4 animate-pulse" />
               </div>
             </div>
           </div>
@@ -1007,6 +1103,166 @@ export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches
                                 : 'bg-red-500/20 text-red-300 border border-red-500/40'
                             }`}>
                               {req.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: WITHDRAWALS APPROVAL QUEUE */}
+          {activeTab === 'withdrawals' && (
+            <div className="bg-[#0e1824] border border-[#1a2d42] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#182a3e] pb-3 gap-3">
+                <div>
+                  <h3 className="text-base font-black text-white font-gaming tracking-wide flex items-center space-x-2">
+                    <ArrowUpCircle className="w-5 h-5 text-amber-400" />
+                    <span>PLAYER WITHDRAWAL REQUESTS & CASHOUT APPROVALS</span>
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Verify player details, chat via WhatsApp (0317-7229994), dispatch funds, and approve or refund.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchWithdrawalRequests}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#142334] hover:bg-[#1b2f46] text-xs font-bold text-gray-300 rounded-xl transition-colors border border-[#1e354e] self-start md:self-auto"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh Queue</span>
+                </button>
+              </div>
+
+              {/* Policy Prompt Notice */}
+              <div className="p-3 bg-gradient-to-r from-[#1b2619] to-[#0e1e2d] rounded-xl border border-emerald-500/40 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center space-x-2 text-emerald-300 font-bold">
+                  <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Prompt to Players: "Withdraw in review contact on 03177229994 whatsapp"</span>
+                </div>
+                <a
+                  href="https://wa.me/923177229994"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] rounded-lg flex items-center space-x-1 shrink-0 transition-colors"
+                >
+                  <span>Open Helpline WhatsApp</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              {withdrawalRequests.length === 0 ? (
+                <div className="text-center py-16 text-gray-500 space-y-2">
+                  <ArrowUpCircle className="w-10 h-10 text-gray-600 mx-auto" />
+                  <p className="text-sm font-semibold text-gray-300">No withdrawal requests submitted yet.</p>
+                  <p className="text-xs text-gray-500">
+                    When players submit a cashout request from their balance, it will appear here in real time!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {withdrawalRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className={`p-4 rounded-2xl border transition-all ${
+                        req.status === 'IN_REVIEW'
+                          ? 'bg-[#142217] border-amber-500/60 shadow-xl'
+                          : req.status === 'APPROVED'
+                          ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : 'bg-red-950/20 border-red-500/30'
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                        {/* Info Column */}
+                        <div className="lg:col-span-3 space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xl font-black text-amber-400 font-gaming">
+                              -{req.amount.toLocaleString()} PKR
+                            </span>
+                            <span className="text-xs bg-[#1a2e44] text-amber-300 font-bold px-2 py-0.5 rounded-lg border border-amber-500/30">
+                              {req.method}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-300">
+                            Player: <strong className="text-white">{req.username}</strong>
+                          </div>
+                          <div className="text-[11px] text-gray-400">
+                            Submitted: {new Date(req.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {/* Account Details Column */}
+                        <div className="lg:col-span-4 bg-[#09111b] p-3 rounded-xl border border-[#162738] space-y-1 text-xs">
+                          <div>
+                            <span className="text-gray-400 block text-[10px]">Account Title:</span>
+                            <strong className="text-white text-sm">{req.accountTitle}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block text-[10px]">Account / Phone Number:</span>
+                            <div className="flex items-center space-x-2">
+                              <strong className="text-emerald-400 font-mono font-bold tracking-wider text-sm">
+                                {req.accountNumber}
+                              </strong>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(req.accountNumber);
+                                  setCopiedTid(req.id);
+                                  setTimeout(() => setCopiedTid(null), 1500);
+                                }}
+                                className="text-gray-400 hover:text-white"
+                                title="Copy Number"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              {copiedTid === req.id && <span className="text-[10px] text-emerald-400">Copied!</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* WhatsApp Helpline Connect Column */}
+                        <div className="lg:col-span-2 flex flex-col items-start justify-center">
+                          <a
+                            href={`https://wa.me/923177229994?text=${encodeURIComponent(
+                              `Salam ${req.username}, Apka 1X-BET withdrawal request (${req.amount} PKR) process kiya ja raha hai.\nAccount: ${req.accountNumber} (${req.accountTitle})\nMethod: ${req.method}`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>Chat on WhatsApp</span>
+                          </a>
+                          <span className="text-[10px] text-gray-500 mt-1 font-mono">0317-7229994</span>
+                        </div>
+
+                        {/* Action Buttons Column */}
+                        <div className="lg:col-span-3 flex flex-col space-y-2">
+                          {req.status === 'IN_REVIEW' ? (
+                            <>
+                              <button
+                                onClick={() => handleApproveWithdrawal(req.id)}
+                                className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-black rounded-xl text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                <span>APPROVE & MARK PAID</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectWithdrawal(req.id)}
+                                className="w-full py-2 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 font-bold rounded-xl text-xs active:scale-95 transition-all flex items-center justify-center space-x-1"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                <span>REJECT & REFUND</span>
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`py-2 px-3 rounded-xl text-center font-black text-xs uppercase ${
+                              req.status === 'APPROVED'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-red-500/20 text-red-300 border border-red-500/40'
+                            }`}>
+                              {req.status === 'APPROVED' ? 'PAID & APPROVED' : req.status}
                             </span>
                           )}
                         </div>
