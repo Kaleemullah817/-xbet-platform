@@ -50,6 +50,17 @@ io.on('connection', (socket) => {
     crashState: state.crashState
   });
 
+  // Dedicated socket user auth sync
+  socket.on('auth_user', ({ userId }) => {
+    if (userId) {
+      const u = state.getUser(userId);
+      if (u) {
+        socket.emit('user_update', u);
+        socket.emit('bets_update', state.getBets(userId));
+      }
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
   });

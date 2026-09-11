@@ -337,20 +337,21 @@ export function createApiRouter(io) {
   // 2. Direct Deposit (Instant demo / bypass)
   router.post('/wallet/deposit', (req, res) => {
     const { amount, method } = req.body;
+    const activeUserId = req.headers['x-user-id'] || req.body.userId || state.currentUserId;
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
       return res.status(400).json({ error: 'Invalid deposit amount' });
     }
 
-    state.updateBalance(numAmount);
+    state.updateBalance(numAmount, activeUserId);
     const tx = state.addTransaction('DEPOSIT', method || 'EasyPaisa', numAmount);
     
     // Broadcast user balance update
-    io.emit('user_update', state.getUser());
+    io.emit('user_update', state.getUser(activeUserId));
 
     res.json({
       success: true,
-      newBalance: state.getUser().balance,
+      newBalance: state.getUser(activeUserId).balance,
       transaction: tx
     });
   });
@@ -358,22 +359,24 @@ export function createApiRouter(io) {
   // 3. Withdrawal Simulation
   router.post('/wallet/withdraw', (req, res) => {
     const { amount, method, accountDetails } = req.body;
+    const activeUserId = req.headers['x-user-id'] || req.body.userId || state.currentUserId;
+    const activeUser = state.getUser(activeUserId);
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
       return res.status(400).json({ error: 'Invalid withdrawal amount' });
     }
-    if (numAmount > state.getUser().balance) {
+    if (numAmount > activeUser.balance) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    state.updateBalance(-numAmount);
+    state.updateBalance(-numAmount, activeUserId);
     const tx = state.addTransaction('WITHDRAWAL', `${method || 'Bank Transfer'} (${accountDetails || 'Default Account'})`, numAmount);
 
-    io.emit('user_update', state.getUser());
+    io.emit('user_update', state.getUser(activeUserId));
 
     res.json({
       success: true,
-      newBalance: state.getUser().balance,
+      newBalance: state.getUser(activeUserId).balance,
       transaction: tx
     });
   });
@@ -386,17 +389,19 @@ export function createApiRouter(io) {
   // 5. Place Bet (Single or Accumulator)
   router.post('/bets/place', (req, res) => {
     const { type, stake, selections, matchId, matchTitle, marketName, selectionName, odds } = req.body;
+    const activeUserId = req.headers['x-user-id'] || req.body.userId || state.currentUserId;
+    const activeUser = state.getUser(activeUserId);
     const numStake = parseFloat(stake);
 
     if (!numStake || numStake < 10) {
       return res.status(400).json({ error: 'Minimum bet stake is 10 PKR' });
     }
-    if (numStake > state.getUser().balance) {
+    if (numStake > activeUser.balance) {
       return res.status(400).json({ error: 'Insufficient balance. Please deposit first!' });
     }
 
     // Deduct stake from balance
-    state.updateBalance(-numStake);
+    state.updateBalance(-numStake, activeUserId);
     state.addTransaction('BET_STAKE', 'Sportsbook Wager', -numStake);
 
     let betRecord;
@@ -408,7 +413,7 @@ export function createApiRouter(io) {
         totalOdds: Number(totalOdds.toFixed(2)),
         stake: numStake,
         potentialPayout: Number((numStake * totalOdds).toFixed(2))
-      });
+      }, activeUserId);
     } else {
       // Single Bet
       betRecord = state.addBet({
@@ -420,24 +425,25 @@ export function createApiRouter(io) {
         odds: Number(odds),
         stake: numStake,
         potentialPayout: Number((numStake * odds).toFixed(2))
-      });
+      }, activeUserId);
     }
 
     // Notify user update & bets update
-    io.emit('user_update', state.getUser());
-    io.emit('bets_update', state.getBets(state.getUser().id));
+    io.emit('user_update', state.getUser(activeUserId));
+    io.emit('bets_update', state.getBets(activeUserId));
     io.emit('admin_live_bets_update', state.getAllBets());
 
     res.json({
       success: true,
       bet: betRecord,
-      newBalance: state.getUser().balance
+      newBalance: state.getUser(activeUserId).balance
     });
   });
 
   // 6. Get User Bets
   router.get('/bets/my', (req, res) => {
-    res.json(state.getBets(state.getUser().id));
+    const activeUserId = req.headers['x-user-id'] || state.currentUserId;
+    res.json(state.getBets(activeUserId));
   });
 
   // 7. Early Cashout Bet

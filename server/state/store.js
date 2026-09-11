@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// In-memory persistent state store for 1xBet Web Platform
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_FILE = path.join(__dirname, '../../store_data.json');
+
+// In-memory + permanent file-persisted state store for 1xBet Web Platform
 class AppState {
   constructor() {
     this.users = [
@@ -394,6 +401,41 @@ class AppState {
       ],
       history: [1.25, 3.40, 1.08, 14.82, 2.15, 1.90, 5.60, 1.12, 4.30]
     };
+
+    // Auto load permanently persisted data from store_data.json
+    this.loadFromFile();
+  }
+
+  saveToFile() {
+    try {
+      const data = {
+        users: this.users,
+        transactions: this.transactions,
+        depositRequests: this.depositRequests,
+        adminPaymentAccounts: this.adminPaymentAccounts,
+        bets: this.bets
+      };
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[Store] Failed to write data file:', e.message);
+    }
+  }
+
+  loadFromFile() {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        const raw = fs.readFileSync(DATA_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.users) && data.users.length > 0) this.users = data.users;
+        if (Array.isArray(data.transactions)) this.transactions = data.transactions;
+        if (Array.isArray(data.depositRequests)) this.depositRequests = data.depositRequests;
+        if (data.adminPaymentAccounts) this.adminPaymentAccounts = data.adminPaymentAccounts;
+        if (Array.isArray(data.bets)) this.bets = data.bets;
+        console.log(`[Store] Successfully loaded ${this.users.length} users and state from ${DATA_FILE}`);
+      }
+    } catch (e) {
+      console.error('[Store] Failed to load data file:', e.message);
+    }
   }
 
   getUser(userId = null) {
@@ -436,6 +478,7 @@ class AppState {
 
     this.users.unshift(newUser);
     this.currentUserId = newUser.id;
+    this.saveToFile();
 
     const { password: _, ...safeUser } = newUser;
     return safeUser;
@@ -482,6 +525,7 @@ class AppState {
 
     u.balance = Math.max(0, Number((u.balance + deltaAmount).toFixed(2)));
     const tx = this.addTransaction('ADMIN_ADJUST', reason, deltaAmount);
+    this.saveToFile();
     return { user: this.getUser(userId), transaction: tx };
   }
 
@@ -489,6 +533,7 @@ class AppState {
     const u = this.users.find(user => user.id === userId);
     if (!u) throw new Error('User not found');
     u.status = u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+    this.saveToFile();
     return this.getUser(userId);
   }
 
@@ -496,6 +541,7 @@ class AppState {
     const u = this.getUserRaw(userId);
     if (u) {
       u.balance = Math.max(0, Number((u.balance + deltaAmount).toFixed(2)));
+      this.saveToFile();
       return u.balance;
     }
     return 0;
@@ -592,6 +638,7 @@ class AppState {
     this.bets.unshift(bet);
     if (this.bets.length > 200) this.bets.pop();
     if (u) u.totalBetsPlaced += 1;
+    this.saveToFile();
     return bet;
   }
 
@@ -611,6 +658,7 @@ class AppState {
     } else {
       bet.actualPayout = 0;
     }
+    this.saveToFile();
     return bet;
   }
 
@@ -620,6 +668,7 @@ class AppState {
 
   updateAdminPaymentAccounts(accounts) {
     this.adminPaymentAccounts = { ...this.adminPaymentAccounts, ...accounts };
+    this.saveToFile();
     return this.adminPaymentAccounts;
   }
 
@@ -640,6 +689,7 @@ class AppState {
       notes: ''
     };
     this.depositRequests.unshift(req);
+    this.saveToFile();
     return req;
   }
 
@@ -668,6 +718,7 @@ class AppState {
     req.status = 'REJECTED';
     req.processedAt = Date.now();
     req.notes = reason;
+    this.saveToFile();
 
     return { request: req };
   }

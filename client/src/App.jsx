@@ -13,9 +13,18 @@ import AuthModal from './components/AuthModal';
 import AdminAuthModal from './components/AdminAuthModal';
 import { Flame, Trophy, Activity, Filter, Search } from 'lucide-react';
 
+function getStoredUser() {
+  try {
+    const saved = localStorage.getItem('xbet_user');
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export default function App() {
   const [socket, setSocket] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(getStoredUser);
   const [transactions, setTransactions] = useState([]);
   const [matches, setMatches] = useState([]);
   const [myBets, setMyBets] = useState([]);
@@ -98,16 +107,33 @@ export default function App() {
     // Initial load through REST
     fetchInitialData();
 
+    newSocket.on('connect', () => {
+      const stored = getStoredUser();
+      if (stored?.id) {
+        newSocket.emit('auth_user', { userId: stored.id });
+      }
+    });
+
     // Socket Event Listeners
     newSocket.on('init_state', (data) => {
-      if (data.user) setUser(data.user);
+      const stored = getStoredUser();
+      if (!stored && data.user) {
+        setUser(data.user);
+        localStorage.setItem('xbet_user', JSON.stringify(data.user));
+      }
       if (data.matches) setMatches(data.matches);
-      if (data.bets) setMyBets(data.bets);
+      if (data.bets && !stored) setMyBets(data.bets);
       if (data.crashState) setCrashState(data.crashState);
     });
 
     newSocket.on('user_update', (updatedUser) => {
-      setUser(updatedUser);
+      const stored = getStoredUser();
+      if (!stored || (updatedUser && updatedUser.id === stored.id)) {
+        setUser(updatedUser);
+        if (updatedUser) {
+          localStorage.setItem('xbet_user', JSON.stringify(updatedUser));
+        }
+      }
     });
 
     newSocket.on('matches_update', (updatedMatches) => {
@@ -136,15 +162,22 @@ export default function App() {
 
   const fetchInitialData = async () => {
     try {
+      const stored = getStoredUser();
+      const currentId = stored?.id;
+      const headers = currentId ? { 'x-user-id': currentId } : {};
+
       const [userRes, matchesRes, betsRes] = await Promise.all([
-        fetch('/api/me'),
+        fetch('/api/me', { headers }),
         fetch('/api/matches'),
-        fetch('/api/bets/my')
+        fetch('/api/bets/my', { headers })
       ]);
 
       if (userRes.ok) {
         const userData = await userRes.json();
-        setUser(userData.user);
+        if (userData.user) {
+          setUser(userData.user);
+          localStorage.setItem('xbet_user', JSON.stringify(userData.user));
+        }
         setTransactions(userData.transactions || []);
       }
       if (matchesRes.ok) {
