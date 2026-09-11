@@ -10,6 +10,7 @@ import WalletModal from './components/WalletModal';
 import AdminDrawer from './components/AdminDrawer';
 import AdminPortal from './components/AdminPortal';
 import AuthModal from './components/AuthModal';
+import AdminAuthModal from './components/AdminAuthModal';
 import { Flame, Trophy, Activity, Filter, Search } from 'lucide-react';
 
 export default function App() {
@@ -33,9 +34,17 @@ export default function App() {
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'live'
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [viewMode, setViewMode] = useState(
-    typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') ? 'admin' : 'player'
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
+    typeof window !== 'undefined' && sessionStorage.getItem('1x_admin_auth') === 'true'
   );
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+
+  const [viewMode, setViewMode] = useState(
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') && sessionStorage.getItem('1x_admin_auth') === 'true'
+      ? 'admin'
+      : 'player'
+  );
+
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -43,11 +52,41 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setViewMode(window.location.pathname.startsWith('/admin') ? 'admin' : 'player');
+      if (window.location.pathname.startsWith('/admin')) {
+        const isAuth = sessionStorage.getItem('1x_admin_auth') === 'true';
+        if (isAuth) {
+          setIsAdminAuthenticated(true);
+          setViewMode('admin');
+        } else {
+          setViewMode('player');
+          setIsAdminAuthModalOpen(true);
+        }
+      } else {
+        setViewMode('player');
+      }
     };
+    handlePopState();
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const handleSecretAdminTrigger = () => {
+    const isAuth = sessionStorage.getItem('1x_admin_auth') === 'true';
+    if (isAuth) {
+      setIsAdminAuthenticated(true);
+      setViewMode('admin');
+      window.history.pushState({}, '', '/admin');
+    } else {
+      setIsAdminAuthModalOpen(true);
+    }
+  };
+
+  const handleAdminAuthSuccess = () => {
+    setIsAdminAuthenticated(true);
+    setIsAdminAuthModalOpen(false);
+    setViewMode('admin');
+    window.history.pushState({}, '', '/admin');
+  };
 
   // Initialize Socket.io connection & initial API fetches
   useEffect(() => {
@@ -178,10 +217,16 @@ export default function App() {
     return true;
   });
 
-  if (viewMode === 'admin') {
+  if (viewMode === 'admin' && isAdminAuthenticated) {
     return (
       <AdminPortal
         onBackToSite={() => {
+          setViewMode('player');
+          window.history.pushState({}, '', '/');
+        }}
+        onLockAdmin={() => {
+          sessionStorage.removeItem('1x_admin_auth');
+          setIsAdminAuthenticated(false);
           setViewMode('player');
           window.history.pushState({}, '', '/');
         }}
@@ -209,10 +254,8 @@ export default function App() {
             setIsWalletOpen(true);
           }
         }}
-        onToggleAdmin={() => {
-          setViewMode('admin');
-          window.history.pushState({}, '', '/admin');
-        }}
+        onToggleAdmin={handleSecretAdminTrigger}
+        onSecretAdminTrigger={handleSecretAdminTrigger}
         isAdminOpen={false}
         onOpenAuth={(mode) => {
           setAuthMode(mode);
@@ -353,6 +396,18 @@ export default function App() {
         matches={matches}
         onUpdateMatches={fetchInitialData}
         onUpdateUser={fetchInitialData}
+      />
+
+      {/* Secret Admin Master PIN Gateway Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          if (window.location.pathname.startsWith('/admin')) {
+            window.history.pushState({}, '', '/');
+          }
+        }}
+        onSuccess={handleAdminAuthSuccess}
       />
     </div>
   );

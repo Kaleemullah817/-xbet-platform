@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Wallet, PlusCircle, Bell, User, Shield, Flame, Activity, Plane, Trophy, Settings } from 'lucide-react';
 
 export default function Header({ 
@@ -7,9 +7,30 @@ export default function Header({
   setActiveTab, 
   onOpenWallet, 
   onToggleAdmin, 
+  onSecretAdminTrigger,
   isAdminOpen,
   onOpenAuth
 }) {
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+
+  const handleLogoClick = () => {
+    setActiveTab('sports');
+    const now = Date.now();
+    if (now - lastClickTime < 1200) {
+      const count = logoClicks + 1;
+      if (count >= 5) {
+        setLogoClicks(0);
+        if (onSecretAdminTrigger) onSecretAdminTrigger();
+      } else {
+        setLogoClicks(count);
+      }
+    } else {
+      setLogoClicks(1);
+    }
+    setLastClickTime(now);
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-[#0c1520] border-b border-[#1c2c3e] shadow-xl">
       {/* Top micro-bar */}
@@ -34,8 +55,9 @@ export default function Header({
         {/* Logo and primary navigation */}
         <div className="flex items-center space-x-6">
           <div 
-            onClick={() => setActiveTab('sports')} 
-            className="cursor-pointer flex items-center space-x-2 group"
+            onClick={handleLogoClick} 
+            className="cursor-pointer flex items-center space-x-2 group select-none"
+            title="1X-BET Global"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center font-black text-2xl text-white shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
               1X
@@ -170,16 +192,6 @@ export default function Header({
               </button>
             </div>
           )}
-
-          {/* Dedicated Admin Panel Portal Button */}
-          <button
-            onClick={onToggleAdmin}
-            title="Open Dedicated Admin Dashboard"
-            className="px-3 py-2 rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 transition-all flex items-center space-x-1.5 text-xs font-extrabold shadow-md shadow-amber-500/10 active:scale-95"
-          >
-            <Settings className="w-4 h-4 animate-spin text-amber-400" />
-            <span className="font-gaming tracking-wide">ADMIN PANEL</span>
-          </button>
         </div>
       </div>
     </header>

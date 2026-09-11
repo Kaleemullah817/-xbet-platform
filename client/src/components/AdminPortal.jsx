@@ -26,11 +26,12 @@ import {
   Search,
   Filter,
   Sparkles,
-  Shield
+  Shield,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function AdminPortal({ onBackToSite, socket, matches = [], onUpdateMatches, user, onUpdateUser }) {
+export default function AdminPortal({ onBackToSite, onLockAdmin, socket, matches = [], onUpdateMatches, user, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('deposits'); // 'deposits' | 'live_bets' | 'accounts' | 'matches' | 'users' | 'otps' | 'crash'
   const [depositRequests, setDepositRequests] = useState([]);
   const [registeredUsers, setRegisteredUsers] = useState([]);
@@ -386,6 +387,15 @@ export default function AdminPortal({ onBackToSite, socket, matches = [], onUpda
           <div className="flex items-center space-x-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-xl text-xs font-bold text-amber-300">
             <span>Admin: SuperAgent</span>
           </div>
+
+          <button
+            onClick={onLockAdmin || onBackToSite}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="Lock and exit Admin Portal"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Lock Admin</span>
+          </button>
         </div>
       </header>
 
