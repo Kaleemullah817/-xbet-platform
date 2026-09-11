@@ -94,6 +94,23 @@ export function startCrashEngine(io) {
         crashState.history.unshift(crashState.crashPoint);
         if (crashState.history.length > 15) crashState.history.pop();
 
+        // Update any active crash bets to CRASHED in state.bets
+        if (state.bets) {
+          let updatedAny = false;
+          state.bets.forEach(b => {
+            if (b.type === 'CRASH' && b.status === 'ACTIVE') {
+              b.status = 'CRASHED';
+              b.actualPayout = 0;
+              b.selectionName = `Bust @ ${crashState.crashPoint}x`;
+              b.settledAt = Date.now();
+              updatedAny = true;
+            }
+          });
+          if (updatedAny) {
+            io.emit('admin_live_bets_update', state.getAllBets());
+          }
+        }
+
         io.emit('crash_state', { ...crashState });
 
         // Wait 3 seconds before next round

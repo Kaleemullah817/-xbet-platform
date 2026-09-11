@@ -13,22 +13,35 @@ import {
   Copy, 
   Save, 
   Plus, 
-  RefreshCw,
-  TrendingUp,
-  AlertCircle,
-  Mail,
-  KeyRound,
-  Plane,
-  Target
+  RefreshCw, 
+  TrendingUp, 
+  AlertCircle, 
+  Mail, 
+  KeyRound, 
+  Plane, 
+  Target,
+  Activity,
+  Gamepad2,
+  Flame,
+  Search,
+  Filter,
+  Sparkles,
+  Shield
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function AdminPortal({ onBackToSite, socket, matches = [], onUpdateMatches, user, onUpdateUser }) {
-  const [activeTab, setActiveTab] = useState('deposits'); // 'deposits' | 'accounts' | 'matches' | 'users' | 'otps' | 'crash'
+  const [activeTab, setActiveTab] = useState('deposits'); // 'deposits' | 'live_bets' | 'accounts' | 'matches' | 'users' | 'otps' | 'crash'
   const [depositRequests, setDepositRequests] = useState([]);
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [otpLogs, setOtpLogs] = useState([]);
   const [crashSlots, setCrashSlots] = useState(Array(10).fill(''));
+  const [liveBets, setLiveBets] = useState([]);
+  const [liveBetsCategory, setLiveBetsCategory] = useState('all');
+  const [liveBetsStatus, setLiveBetsStatus] = useState('all');
+  const [liveBetsSearch, setLiveBetsSearch] = useState('');
+  const [isRefreshingBets, setIsRefreshingBets] = useState(false);
+
   const [smtpSettings, setSmtpSettings] = useState({
     host: 'smtp.gmail.com',
     port: 465,
@@ -68,6 +81,7 @@ export default function AdminPortal({ onBackToSite, socket, matches = [], onUpda
     fetchAccounts();
     fetchUsers();
     fetchCrashSlots();
+    fetchLiveBets();
   }, []);
 
   useEffect(() => {
@@ -77,9 +91,33 @@ export default function AdminPortal({ onBackToSite, socket, matches = [], onUpda
         setCrashSlots(updatedSlots);
       }
     };
+    const handleLiveBetsSync = (updatedBets) => {
+      if (Array.isArray(updatedBets)) {
+        setLiveBets(updatedBets);
+      }
+    };
     socket.on('crash_slots_update', handleSlotsSync);
-    return () => socket.off('crash_slots_update', handleSlotsSync);
+    socket.on('admin_live_bets_update', handleLiveBetsSync);
+    return () => {
+      socket.off('crash_slots_update', handleSlotsSync);
+      socket.off('admin_live_bets_update', handleLiveBetsSync);
+    };
   }, [socket]);
+
+  const fetchLiveBets = async () => {
+    setIsRefreshingBets(true);
+    try {
+      const res = await fetch('/api/admin/live-bets');
+      if (res.ok) {
+        const data = await res.json();
+        setLiveBets(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRefreshingBets(false);
+    }
+  };
 
   const fetchCrashSlots = () => {
     fetch('/api/admin/crash-slots')
@@ -375,6 +413,26 @@ export default function AdminPortal({ onBackToSite, socket, matches = [], onUpda
               )}
             </button>
 
+            {/* Live Bets & Player Activity Tab */}
+            <button
+              onClick={() => { setActiveTab('live_bets'); setNotification(null); fetchLiveBets(); }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'live_bets'
+                  ? 'bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 text-white shadow-lg shadow-cyan-600/30'
+                  : 'text-gray-300 hover:bg-[#121e2d] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Activity className="w-4 h-4 text-cyan-400" />
+                <span>Live Bets & Action</span>
+              </div>
+              {liveBets.filter(b => b.status === 'ACTIVE').length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-black text-[9px] font-black animate-pulse shadow-sm">
+                  {liveBets.filter(b => b.status === 'ACTIVE').length} LIVE
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => { setActiveTab('accounts'); setNotification(null); fetchAccounts(); }}
               className={`w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -489,14 +547,323 @@ export default function AdminPortal({ onBackToSite, socket, matches = [], onUpda
 
             <div className="bg-[#0e1824] border border-[#1a2d42] p-4 rounded-2xl flex items-center justify-between shadow-md">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Active Matches</span>
-                <div className="text-2xl font-black text-purple-400 font-gaming mt-0.5">{matches.length}</div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Live In-Play Bets</span>
+                <div className="text-2xl font-black text-emerald-400 font-gaming mt-0.5">
+                  {liveBets.filter(b => b.status === 'ACTIVE').length} Active
+                </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-                <Trophy className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <Activity className="w-5 h-5 animate-pulse" />
               </div>
             </div>
           </div>
+
+          {/* TAB: LIVE BETS & PLAYER ACTIVITY MONITOR */}
+          {activeTab === 'live_bets' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="bg-[#0e1824] border border-[#1a2d42] rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center text-white shadow-md">
+                      <Activity className="w-4 h-4 animate-pulse" />
+                    </div>
+                    <h3 className="text-base font-black text-white font-gaming tracking-wide">
+                      LIVE BETS & PLAYER ACTIVITY MONITOR
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold">
+                      Real-Time WebSocket Feed
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Live tracker of all players, their current game (Aviator, Sportsbook, Casino), stakes, odds, and instant payouts.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2.5">
+                  <button
+                    onClick={fetchLiveBets}
+                    disabled={isRefreshingBets}
+                    className="flex items-center space-x-2 px-4 py-2.5 bg-[#142334] hover:bg-[#1c3046] text-xs font-bold text-gray-200 rounded-xl transition-all border border-[#1e3752] active:scale-95 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingBets ? 'animate-spin text-cyan-400' : ''}`} />
+                    <span>Refresh Feed</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Financial & Activity KPI Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#0b131e] border border-[#16273b] p-4 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-bold uppercase">
+                    <span>Total Wagers Volume</span>
+                    <DollarSign className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <div className="text-2xl font-black text-white font-gaming mt-2">
+                    ₨ {liveBets.reduce((sum, b) => sum + (Number(b.stake) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1">Across all sports & casino games</div>
+                </div>
+
+                <div className="bg-[#0b131e] border border-[#16273b] p-4 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-bold uppercase">
+                    <span>Active Bets In-Play</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-400 font-gaming mt-2">
+                    {liveBets.filter(b => b.status === 'ACTIVE').length} Bets
+                  </div>
+                  <div className="text-[10px] text-emerald-400/80 mt-1">
+                    ₨ {liveBets.filter(b => b.status === 'ACTIVE').reduce((sum, b) => sum + (Number(b.stake) || 0), 0).toLocaleString()} PKR currently on stake
+                  </div>
+                </div>
+
+                <div className="bg-[#0b131e] border border-[#16273b] p-4 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-bold uppercase">
+                    <span>Player Payouts Won</span>
+                    <Trophy className="w-4 h-4 text-yellow-400" />
+                  </div>
+                  <div className="text-2xl font-black text-yellow-400 font-gaming mt-2">
+                    ₨ {liveBets.reduce((sum, b) => sum + (Number(b.actualPayout) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1">Total winnings disbursed to players</div>
+                </div>
+
+                <div className="bg-[#0b131e] border border-[#16273b] p-4 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-bold uppercase">
+                    <span>House Gross Margin</span>
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-black text-cyan-300 font-gaming mt-2">
+                    ₨ {(
+                      liveBets.reduce((sum, b) => sum + (Number(b.stake) || 0), 0) -
+                      liveBets.reduce((sum, b) => sum + (Number(b.actualPayout) || 0), 0)
+                    ).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1">Platform retained net revenue</div>
+                </div>
+              </div>
+
+              {/* Filters & Search Toolbar */}
+              <div className="bg-[#0e1824] border border-[#1a2d42] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-md">
+                {/* Category Pills */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+                  {[
+                    { id: 'all', label: 'All Games' },
+                    { id: 'crash', label: '✈️ Aviator Crash' },
+                    { id: 'sports', label: '⚽🏏 Live Sportsbook' },
+                    { id: 'casino', label: '🎰 Casino Suite' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setLiveBetsCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        liveBetsCategory === cat.id
+                          ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                          : 'bg-[#121f2e] text-gray-400 hover:text-white hover:bg-[#182a3e]'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Status & Search */}
+                <div className="flex items-center space-x-2.5 w-full md:w-auto">
+                  <select
+                    value={liveBetsStatus}
+                    onChange={(e) => setLiveBetsStatus(e.target.value)}
+                    className="bg-[#121f2e] border border-[#1e344e] text-xs font-bold text-gray-200 rounded-xl px-3 py-2 outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="ACTIVE">🟢 Active / In-Play</option>
+                    <option value="WON">🏆 Won</option>
+                    <option value="LOST">🔴 Lost / Crashed</option>
+                  </select>
+
+                  <div className="relative flex-1 md:w-64">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search player or game..."
+                      value={liveBetsSearch}
+                      onChange={(e) => setLiveBetsSearch(e.target.value)}
+                      className="w-full bg-[#121f2e] border border-[#1e344e] rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Bets Table */}
+              <div className="bg-[#0e1824] border border-[#1a2d42] rounded-2xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-[#0a121c] border-b border-[#18293c] text-[10px] font-black uppercase tracking-wider text-gray-400">
+                        <th className="py-3.5 px-4">Player / User</th>
+                        <th className="py-3.5 px-4">Game & Category</th>
+                        <th className="py-3.5 px-4">Bet Market / Pick</th>
+                        <th className="py-3.5 px-4 text-right">Stake (PKR)</th>
+                        <th className="py-3.5 px-4 text-center">Odds / Mult</th>
+                        <th className="py-3.5 px-4 text-center">Status</th>
+                        <th className="py-3.5 px-4 text-right">Payout (PKR)</th>
+                        <th className="py-3.5 px-4 text-right">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#152536] text-xs">
+                      {liveBets
+                        .filter(b => {
+                          if (liveBetsCategory === 'sports' && b.gameCategory !== 'Sportsbook Live') return false;
+                          if (liveBetsCategory === 'crash' && b.gameCategory !== 'Aviator Crash') return false;
+                          if (liveBetsCategory === 'casino' && !b.gameCategory.startsWith('Casino')) return false;
+
+                          if (liveBetsStatus === 'ACTIVE' && b.status !== 'ACTIVE') return false;
+                          if (liveBetsStatus === 'WON' && b.status !== 'WON') return false;
+                          if (liveBetsStatus === 'LOST' && (b.status !== 'LOST' && b.status !== 'CRASHED')) return false;
+
+                          if (liveBetsSearch.trim()) {
+                            const q = liveBetsSearch.toLowerCase();
+                            const u = (b.username || '').toLowerCase().includes(q);
+                            const p = (b.phone || '').toLowerCase().includes(q);
+                            const t = (b.gameTitle || b.matchTitle || '').toLowerCase().includes(q);
+                            const m = (b.marketName || '').toLowerCase().includes(q);
+                            const s = (b.selectionName || '').toLowerCase().includes(q);
+                            if (!u && !p && !t && !m && !s) return false;
+                          }
+                          return true;
+                        })
+                        .map((bet) => {
+                          const isWon = bet.status === 'WON';
+                          const isLost = bet.status === 'LOST' || bet.status === 'CRASHED';
+                          const isActive = bet.status === 'ACTIVE';
+                          const isCashedOut = bet.status === 'CASHED_OUT';
+
+                          return (
+                            <tr key={bet.id} className="hover:bg-[#121e2d] transition-colors">
+                              {/* Player column */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center space-x-2.5">
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center font-bold text-white text-xs shadow-sm">
+                                    {(bet.username || 'P')[0].toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-white flex items-center space-x-1.5">
+                                      <span>{bet.username || 'Player'}</span>
+                                      {bet.isRealPlayer && (
+                                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
+                                          REAL
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-mono">{bet.phone || '0300-***'}</div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Game column */}
+                              <td className="py-3.5 px-4">
+                                <div>
+                                  <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold mb-1 ${
+                                    bet.gameCategory === 'Aviator Crash' 
+                                      ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                      : bet.gameCategory === 'Sportsbook Live'
+                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                  }`}>
+                                    {bet.gameCategory}
+                                  </span>
+                                  <div className="font-semibold text-gray-200 line-clamp-1">{bet.gameTitle || bet.matchTitle}</div>
+                                </div>
+                              </td>
+
+                              {/* Selection column */}
+                              <td className="py-3.5 px-4">
+                                <div>
+                                  <div className="font-bold text-cyan-300">{bet.selectionName}</div>
+                                  <div className="text-[10px] text-gray-400">{bet.marketName}</div>
+                                </div>
+                              </td>
+
+                              {/* Stake */}
+                              <td className="py-3.5 px-4 text-right">
+                                <span className="font-black text-white font-gaming text-sm">
+                                  ₨ {Number(bet.stake).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                              </td>
+
+                              {/* Odds / Multiplier */}
+                              <td className="py-3.5 px-4 text-center">
+                                <span className="font-mono font-bold bg-[#142232] border border-[#1f3750] px-2 py-1 rounded-lg text-cyan-400">
+                                  {Number(bet.odds || 1.85).toFixed(2)}x
+                                </span>
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3.5 px-4 text-center">
+                                {isActive && (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black text-[10px] animate-pulse">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                    <span>IN-PLAY</span>
+                                  </span>
+                                )}
+                                {isWon && (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-600/30 border border-emerald-500 text-emerald-300 font-black text-[10px]">
+                                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                                    <span>WON</span>
+                                  </span>
+                                )}
+                                {isLost && (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-400 font-black text-[10px]">
+                                    <XCircle className="w-3 h-3" />
+                                    <span>{bet.status === 'CRASHED' ? 'CRASHED' : 'LOST'}</span>
+                                  </span>
+                                )}
+                                {isCashedOut && (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 font-black text-[10px]">
+                                    <CheckCircle className="w-3 h-3" />
+                                    <span>CASHED OUT</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Payout */}
+                              <td className="py-3.5 px-4 text-right">
+                                {isWon || isCashedOut ? (
+                                  <span className="font-black text-emerald-400 font-gaming text-sm">
+                                    +₨ {Number(bet.actualPayout).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                ) : isActive ? (
+                                  <span className="text-gray-400 font-mono text-[11px]">
+                                    Pot: ₨{Number(bet.potentialPayout).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-500 font-mono text-xs">₨ 0.00</span>
+                                )}
+                              </td>
+
+                              {/* Time */}
+                              <td className="py-3.5 px-4 text-right text-gray-400 text-[11px] font-mono whitespace-nowrap">
+                                {new Date(bet.placedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                      {liveBets.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-gray-400">
+                            <Activity className="w-10 h-10 text-gray-600 mx-auto mb-2 animate-pulse" />
+                            <div className="text-sm font-bold text-gray-300">No Live Bets Placed Yet</div>
+                            <div className="text-xs text-gray-500 mt-1">Jab bhi koi player sports, Aviator ya casino mein bet lagayega, wo yahan live show hoga!</div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: DEPOSITS APPROVAL QUEUE */}
           {activeTab === 'deposits' && (

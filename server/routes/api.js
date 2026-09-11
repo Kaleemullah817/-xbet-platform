@@ -158,6 +158,11 @@ export function createApiRouter(io) {
     res.json({ success: true, slots: updated });
   });
 
+  // Admin: Live Bets & Player Activity Tracker
+  router.get('/admin/live-bets', (req, res) => {
+    res.json(state.getAllBets());
+  });
+
   // Real World Sports Feed Endpoints
   router.get('/admin/real-sports-status', (req, res) => {
     res.json(getRealSportsStatus());
@@ -421,6 +426,7 @@ export function createApiRouter(io) {
     // Notify user update & bets update
     io.emit('user_update', state.getUser());
     io.emit('bets_update', state.getBets(state.getUser().id));
+    io.emit('admin_live_bets_update', state.getAllBets());
 
     res.json({
       success: true,
@@ -453,12 +459,33 @@ export function createApiRouter(io) {
 
     io.emit('user_update', state.getUser());
     io.emit('bets_update', state.getBets(state.getUser().id));
+    io.emit('admin_live_bets_update', state.getAllBets());
 
     res.json({
       success: true,
       cashoutAmount,
       newBalance: state.getUser().balance
     });
+  });
+
+  // Settle Casino Bet
+  router.post('/bets/settle-casino', (req, res) => {
+    const { betId, won, multiplier, payout, selectionName } = req.body;
+    let bet = null;
+    if (betId) {
+      bet = state.bets.find(b => b.id === betId);
+    } else {
+      bet = state.bets.find(b => b.userId === state.getUser().id && b.status === 'ACTIVE' && b.gameCategory.startsWith('Casino'));
+    }
+    if (bet) {
+      bet.status = won ? 'WON' : 'LOST';
+      if (multiplier) bet.odds = Number(multiplier);
+      if (payout !== undefined) bet.actualPayout = Number(payout);
+      if (selectionName) bet.selectionName = selectionName;
+      bet.settledAt = Date.now();
+      io.emit('admin_live_bets_update', state.getAllBets());
+    }
+    res.json({ success: true, bet });
   });
 
   // 8. Aviator / Crash Bet Placement
@@ -481,7 +508,23 @@ export function createApiRouter(io) {
         amount: numAmount
       });
 
+      const crashBetRecord = state.addBet({
+        type: 'CRASH',
+        gameCategory: 'Aviator Crash',
+        gameTitle: `Aviator Jet (Round #${state.crashState.roundId})`,
+        matchTitle: 'Aviator Supersonic Jet',
+        marketName: 'Takeoff Ascent',
+        selectionName: 'In-Flight',
+        odds: 1.00,
+        stake: numAmount,
+        potentialPayout: 0,
+        status: 'ACTIVE',
+        crashRoundId: state.crashState.roundId,
+        crashBetId: bet.id
+      }, state.getUser().id);
+
       io.emit('user_update', state.getUser());
+      io.emit('admin_live_bets_update', state.getAllBets());
       res.json({ success: true, bet });
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -497,7 +540,17 @@ export function createApiRouter(io) {
       state.updateBalance(payout);
       state.addTransaction('CRASH_WIN', `Aviator Won (${bet.cashoutMultiplier}x)`, payout);
 
+      const storedBet = state.bets.find(b => b.crashBetId === betId || (b.type === 'CRASH' && b.status === 'ACTIVE' && b.stake === bet.amount));
+      if (storedBet) {
+        storedBet.status = 'WON';
+        storedBet.odds = bet.cashoutMultiplier;
+        storedBet.actualPayout = payout;
+        storedBet.selectionName = `Cashed out @ ${bet.cashoutMultiplier}x`;
+        storedBet.settledAt = Date.now();
+      }
+
       io.emit('user_update', state.getUser());
+      io.emit('admin_live_bets_update', state.getAllBets());
       res.json({
         success: true,
         bet,

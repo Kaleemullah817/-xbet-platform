@@ -279,18 +279,103 @@ class AppState {
 
     this.bets = [
       {
-        id: 'bet_demo_01',
-        userId: 'usr_demo_1001',
-        type: 'SINGLE',
-        matchId: 'cricket_psl_01',
+        id: 'bet_live_01',
+        userId: 'usr_1001',
+        username: 'Player_777',
+        phone: '03001234567',
+        isRealPlayer: true,
+        gameCategory: 'Sportsbook Live',
+        gameTitle: 'Lahore Qalandars vs Karachi Kings',
         matchTitle: 'Lahore Qalandars vs Karachi Kings',
         marketName: 'Match Winner',
         selectionName: 'Lahore Qalandars',
+        type: 'SINGLE',
         odds: 1.85,
-        stake: 1000.00,
-        potentialPayout: 1850.00,
+        stake: 2500.00,
+        potentialPayout: 4625.00,
+        actualPayout: 0,
         status: 'ACTIVE',
-        placedAt: Date.now() - 1800000,
+        placedAt: Date.now() - 120000,
+        settledAt: null
+      },
+      {
+        id: 'bet_live_02',
+        userId: 'usr_1001',
+        username: 'Player_777',
+        phone: '03001234567',
+        isRealPlayer: true,
+        gameCategory: 'Aviator Crash',
+        gameTitle: 'Aviator Supersonic Jet (Round #101)',
+        matchTitle: 'Aviator Supersonic Jet',
+        marketName: 'Takeoff Multiplier',
+        selectionName: 'Cashed out @ 2.85x',
+        type: 'CRASH',
+        odds: 2.85,
+        stake: 1000.00,
+        potentialPayout: 2850.00,
+        actualPayout: 2850.00,
+        status: 'WON',
+        placedAt: Date.now() - 480000,
+        settledAt: Date.now() - 420000
+      },
+      {
+        id: 'bet_live_03',
+        userId: 'usr_kamran_99',
+        username: 'Kamran_Khan',
+        phone: '0312-9988112',
+        isRealPlayer: true,
+        gameCategory: 'Sportsbook Live',
+        gameTitle: 'Chelsea vs Hull City',
+        matchTitle: 'Chelsea vs Hull City',
+        marketName: 'Match Winner (1X2)',
+        selectionName: 'Chelsea',
+        type: 'SINGLE',
+        odds: 2.17,
+        stake: 5000.00,
+        potentialPayout: 10850.00,
+        actualPayout: 0,
+        status: 'ACTIVE',
+        placedAt: Date.now() - 900000,
+        settledAt: null
+      },
+      {
+        id: 'bet_live_04',
+        userId: 'usr_sultan_7',
+        username: 'Sultan_Vip',
+        phone: '0345-5551234',
+        isRealPlayer: true,
+        gameCategory: 'Casino - Mines',
+        gameTitle: '1X-Mines Turbo (5x5 Grid)',
+        matchTitle: '1X-Mines Turbo',
+        marketName: '3 Mines Mode',
+        selectionName: '5 Gems Revealed',
+        type: 'SINGLE',
+        odds: 1.95,
+        stake: 1500.00,
+        potentialPayout: 2925.00,
+        actualPayout: 2925.00,
+        status: 'WON',
+        placedAt: Date.now() - 1500000,
+        settledAt: Date.now() - 1470000
+      },
+      {
+        id: 'bet_live_05',
+        userId: 'usr_ali_raza',
+        username: 'Ali_Raza_PK',
+        phone: '0333-7711223',
+        isRealPlayer: true,
+        gameCategory: 'Casino - Roulette',
+        gameTitle: 'European Roulette 0-36',
+        matchTitle: 'European Roulette',
+        marketName: 'Color Bet',
+        selectionName: 'Red (1-18)',
+        type: 'SINGLE',
+        odds: 2.00,
+        stake: 800.00,
+        potentialPayout: 1600.00,
+        actualPayout: 0,
+        status: 'ACTIVE',
+        placedAt: Date.now() - 300000,
         settledAt: null
       }
     ];
@@ -456,18 +541,56 @@ class AppState {
     return this.bets.filter(b => b.userId === userId);
   }
 
+  getAllBets() {
+    return this.bets;
+  }
+
   addBet(betData, userId = null) {
     const id = userId || this.currentUserId;
     const u = this.getUserRaw(id);
+    
+    // Auto-detect game category if not specified
+    let category = betData.gameCategory;
+    const title = betData.gameTitle || betData.matchTitle || 'Sportsbook Match';
+    if (!category) {
+      const lower = title.toLowerCase();
+      if (lower.includes('aviator') || lower.includes('crash')) category = 'Aviator Crash';
+      else if (lower.includes('mines')) category = 'Casino - Mines';
+      else if (lower.includes('plinko')) category = 'Casino - Plinko';
+      else if (lower.includes('dice')) category = 'Casino - Dice';
+      else if (lower.includes('wheel')) category = 'Casino - Spin Wheel';
+      else if (lower.includes('slot')) category = 'Casino - Slots';
+      else if (lower.includes('roulette')) category = 'Casino - Roulette';
+      else if (lower.includes('blackjack')) category = 'Casino - Blackjack';
+      else if (lower.includes('teen patti') || lower.includes('teen_patti')) category = 'Casino - Teen Patti';
+      else if (lower.includes('andar bahar') || lower.includes('andar_bahar')) category = 'Casino - Andar Bahar';
+      else category = 'Sportsbook Live';
+    }
+
     const bet = {
       id: 'bet_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
       userId: id,
+      username: u ? u.username : (betData.username || 'Player'),
+      phone: u ? u.phone : (betData.phone || '0300-***'),
+      isRealPlayer: betData.isRealPlayer !== undefined ? betData.isRealPlayer : true,
+      gameCategory: category,
+      gameTitle: title,
+      matchTitle: title,
+      marketName: betData.marketName || 'Standard Market',
+      selectionName: betData.selectionName || 'Standard Selection',
+      type: betData.type || 'SINGLE',
+      odds: Number(betData.odds || 1.85),
+      stake: Number(betData.stake || 0),
+      potentialPayout: Number(betData.potentialPayout || (betData.stake * (betData.odds || 1.85)).toFixed(2)),
+      actualPayout: betData.actualPayout || 0,
+      status: betData.status || 'ACTIVE',
       placedAt: Date.now(),
-      status: 'ACTIVE',
-      settledAt: null,
+      settledAt: betData.settledAt || null,
       ...betData
     };
+
     this.bets.unshift(bet);
+    if (this.bets.length > 200) this.bets.pop();
     if (u) u.totalBetsPlaced += 1;
     return bet;
   }
