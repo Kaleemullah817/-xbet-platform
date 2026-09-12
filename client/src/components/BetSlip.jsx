@@ -8,7 +8,8 @@ import {
   Award,
   Zap,
   ArrowRight,
-  Layers
+  Layers,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -19,7 +20,9 @@ export default function BetSlip({
   myBets = [], 
   user, 
   onBetPlaced,
-  onCashout
+  onCashout,
+  isMobile = false,
+  onClose
 }) {
   const [activeTab, setActiveTab] = useState('slip'); // 'slip' | 'myBets'
   const [betType, setBetType] = useState('single'); // 'single' | 'accumulator'
@@ -125,43 +128,59 @@ export default function BetSlip({
     }
   };
 
-  return (
-    <div className="w-80 bg-[#0d1622] border-l border-[#1a2b3d] flex flex-col h-[calc(100vh-64px)] sticky top-16 select-none shadow-2xl">
+  const slipContent = (
+    <div className={`bg-[#0d1622] border-l border-[#1a2b3d] flex flex-col select-none shadow-2xl ${
+      isMobile 
+        ? 'w-full max-w-md h-[88vh] rounded-2xl border border-[#20344a] overflow-hidden' 
+        : 'w-80 h-[calc(100vh-64px)] sticky top-16'
+    }`}>
       {/* Top Slip vs My Bets Tab */}
-      <div className="grid grid-cols-2 p-2 bg-[#090f17] border-b border-[#182737] gap-1">
-        <button
-          onClick={() => setActiveTab('slip')}
-          className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
-            activeTab === 'slip'
-              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>BET SLIP</span>
-          {selectedBets.length > 0 && (
-            <span className="w-5 h-5 rounded-full bg-emerald-400 text-black text-[10px] font-black flex items-center justify-center ml-1">
-              {selectedBets.length}
-            </span>
-          )}
-        </button>
+      <div className="flex items-center justify-between p-2 bg-[#090f17] border-b border-[#182737] gap-1">
+        <div className="grid grid-cols-2 flex-1 gap-1">
+          <button
+            onClick={() => setActiveTab('slip')}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
+              activeTab === 'slip'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>BET SLIP</span>
+            {selectedBets.length > 0 && (
+              <span className="w-5 h-5 rounded-full bg-emerald-400 text-black text-[10px] font-black flex items-center justify-center ml-1">
+                {selectedBets.length}
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => setActiveTab('myBets')}
-          className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
-            activeTab === 'myBets'
-              ? 'bg-[#182a3d] text-white shadow-md'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5 text-amber-400" />
-          <span>MY BETS</span>
-          {myBets.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-[#20374e] text-gray-300 text-[10px] font-bold">
-              {myBets.length}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => setActiveTab('myBets')}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 ${
+              activeTab === 'myBets'
+                ? 'bg-[#182a3d] text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-amber-400" />
+            <span>MY BETS</span>
+            {myBets.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-[#20374e] text-gray-300 text-[10px] font-bold">
+                {myBets.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {isMobile && onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 ml-1 text-gray-400 hover:text-white rounded-lg hover:bg-[#152332]"
+            title="Close Bet Slip"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {activeTab === 'slip' ? (
@@ -419,6 +438,20 @@ export default function BetSlip({
           )}
         </div>
       )}
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-fade-in">
+        {slipContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="hidden xl:flex">
+      {slipContent}
     </div>
   );
 }

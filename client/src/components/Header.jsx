@@ -194,6 +194,59 @@ export default function Header({
           )}
         </div>
       </div>
+
+      {/* Mobile Sub-Navigation Bar - Visible on mobile/tablet / Android APK */}
+      <div className="lg:hidden flex items-center px-2.5 py-1.5 bg-[#09111a] border-t border-[#162536] overflow-x-auto gap-1.5 text-xs font-bold scrollbar-none select-none">
+        <button
+          onClick={() => setActiveTab('sports')}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+            activeTab === 'sports'
+              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+              : 'text-gray-400 hover:text-white bg-[#101b27]'
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5 text-cyan-300" />
+          <span>SPORTS</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('live')}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+            activeTab === 'live'
+              ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md'
+              : 'text-gray-400 hover:text-white bg-[#101b27]'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+          <span>LIVE IN-PLAY</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crash')}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+            activeTab === 'crash'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+              : 'text-gray-400 hover:text-white bg-[#101b27]'
+          }`}
+        >
+          <Plane className="w-3.5 h-3.5 text-purple-300 animate-pulse" />
+          <span>AVIATOR</span>
+          <span className="text-[9px] bg-red-500 text-white px-1 py-0.2 rounded font-black">HOT</span>
+        </button>
+
+        {/* CASINO BUTTON - PROMINENT GOLDEN GLOW */}
+        <button
+          onClick={() => setActiveTab('casino')}
+          className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all font-black ${
+            activeTab === 'casino'
+              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-400'
+              : 'text-amber-300 hover:text-amber-200 bg-[#1e190b] border border-amber-500/50'
+          }`}
+        >
+          <Flame className="w-4 h-4 text-amber-400 animate-bounce" />
+          <span>🎰 CASINO (10 GAMES)</span>
+        </button>
+      </div>
     </header>
   );
 }

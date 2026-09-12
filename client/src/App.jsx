@@ -11,7 +11,7 @@ import AdminDrawer from './components/AdminDrawer';
 import AdminPortal from './components/AdminPortal';
 import AuthModal from './components/AuthModal';
 import AdminAuthModal from './components/AdminAuthModal';
-import { Flame, Trophy, Activity, Filter, Search } from 'lucide-react';
+import { Flame, Trophy, Activity, Filter, Search, Plane, Wallet, Layers, ChevronRight, ChevronLeft, X } from 'lucide-react';
 
 function getStoredUser() {
   try {
@@ -42,6 +42,10 @@ export default function App() {
   const [selectedSport, setSelectedSport] = useState('all');
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'live'
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    typeof window !== 'undefined' && window.innerWidth < 1024
+  );
+  const [isMobileBetSlipOpen, setIsMobileBetSlipOpen] = useState(false);
 
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(
     typeof window !== 'undefined' && sessionStorage.getItem('1x_admin_auth') === 'true'
@@ -298,16 +302,20 @@ export default function App() {
 
       {/* Main Content Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sports Navigation Sidebar */}
-        <SportsSidebar
-          selectedSport={selectedSport}
-          setSelectedSport={setSelectedSport}
-          filterMode={filterMode}
-          setFilterMode={setFilterMode}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          matches={matches}
-        />
+        {/* Left Sports Navigation Sidebar (Visible for Sports & Live) */}
+        {(activeTab === 'sports' || activeTab === 'live') && (
+          <SportsSidebar
+            selectedSport={selectedSport}
+            setSelectedSport={setSelectedSport}
+            filterMode={filterMode}
+            setFilterMode={setFilterMode}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            matches={matches}
+            isCollapsed={isSidebarCollapsed}
+            setIsCollapsed={setIsSidebarCollapsed}
+          />
+        )}
 
         {/* Center Main Stage */}
         <main className="flex-1 flex flex-col overflow-y-auto bg-[#0b131d]">
@@ -325,15 +333,41 @@ export default function App() {
             />
           ) : (
             // Sports & Live Feed
-            <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto w-full">
+            <div className="p-3 md:p-6 space-y-4 max-w-5xl mx-auto w-full">
+              {/* Mobile Quick Filter Toggle */}
+              <div className="lg:hidden flex items-center justify-between pb-1">
+                <button
+                  onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                  className="px-3 py-1.5 bg-[#142232] hover:bg-[#1a2d42] text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md active:scale-95 transition-all"
+                >
+                  {isSidebarCollapsed ? (
+                    <>
+                      <Filter className="w-3.5 h-3.5" />
+                      <span>All Matches & Leagues</span>
+                      <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                    </>
+                  ) : (
+                    <>
+                      <ChevronLeft className="w-3.5 h-3.5 mr-0.5" />
+                      <span>Hide Sidebar</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center space-x-2 text-[11px] text-gray-400">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  <span>Live odds</span>
+                </div>
+              </div>
+
               {/* Promotional Hero Banner */}
-              <div className="rounded-2xl overflow-hidden bg-gradient-to-r from-blue-900 via-cyan-900 to-[#0c1b2b] p-6 border border-cyan-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="space-y-2">
+              <div className="rounded-2xl overflow-hidden bg-gradient-to-r from-blue-900 via-cyan-900 to-[#0c1b2b] p-5 md:p-6 border border-cyan-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="space-y-2 text-center md:text-left">
                   <div className="inline-flex items-center space-x-2 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-3 py-1 rounded-full text-xs font-bold">
                     <Flame className="w-3.5 h-3.5 text-amber-400" />
                     <span>SUPER MATCH OF THE DAY</span>
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-black text-white font-gaming tracking-wide">
+                  <h2 className="text-xl md:text-3xl font-black text-white font-gaming tracking-wide">
                     PSL & CHAMPIONS TROPHY SPECIAL
                   </h2>
                   <p className="text-xs text-gray-300 max-w-lg">
@@ -345,7 +379,7 @@ export default function App() {
                     setSelectedSport('cricket');
                     setActiveTab('sports');
                   }}
-                  className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all whitespace-nowrap"
+                  className="w-full md:w-auto px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all whitespace-nowrap"
                 >
                   BET ON CRICKET
                 </button>
@@ -355,7 +389,7 @@ export default function App() {
               <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center space-x-2">
                   <Trophy className="w-5 h-5 text-cyan-400" />
-                  <h3 className="text-base font-extrabold text-white font-gaming tracking-wider uppercase">
+                  <h3 className="text-sm md:text-base font-extrabold text-white font-gaming tracking-wider uppercase">
                     {activeTab === 'live' ? '🔥 Live In-Play Matches' : `${selectedSport.toUpperCase()} FIXTURES`}
                   </h3>
                   <span className="text-xs bg-[#16293c] text-cyan-400 font-bold px-2 py-0.5 rounded-full border border-cyan-500/30">
@@ -363,14 +397,14 @@ export default function App() {
                   </span>
                 </div>
 
-                <div className="flex items-center space-x-2 text-xs text-gray-400">
+                <div className="hidden sm:flex items-center space-x-2 text-xs text-gray-400">
                   <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
                   <span>Odds update live every 2s</span>
                 </div>
               </div>
 
               {/* Matches List */}
-              <div className="space-y-3">
+              <div className="space-y-3 pb-16 lg:pb-4">
                 {filteredMatches.length === 0 ? (
                   <div className="text-center py-16 bg-[#0e1824] rounded-2xl border border-[#1a2d40] text-gray-400 space-y-2">
                     <p className="font-semibold text-sm">No matches found for your filter.</p>
@@ -391,7 +425,7 @@ export default function App() {
           )}
         </main>
 
-        {/* Right Bet Slip & Bets History Sidebar */}
+        {/* Right Bet Slip & Bets History Sidebar (Desktop XL) */}
         <BetSlip
           selectedBets={selectedBets}
           onRemoveBet={handleRemoveBet}
@@ -400,8 +434,128 @@ export default function App() {
           user={user}
           onBetPlaced={fetchInitialData}
           onCashout={handleCashout}
+          isMobile={false}
         />
       </div>
+
+      {/* Mobile Floating Bet Slip Trigger */}
+      {selectedBets.length > 0 && !isMobileBetSlipOpen && (
+        <button
+          onClick={() => setIsMobileBetSlipOpen(true)}
+          className="xl:hidden fixed bottom-16 right-4 z-40 bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-black px-4 py-2.5 rounded-full shadow-2xl flex items-center space-x-2 border border-white/40 active:scale-95 transition-all"
+        >
+          <Layers className="w-4 h-4 text-black" />
+          <span className="text-xs uppercase tracking-wider font-extrabold">Bet Slip</span>
+          <span className="bg-black text-emerald-400 text-xs px-2 py-0.5 rounded-full font-black">
+            {selectedBets.length}
+          </span>
+        </button>
+      )}
+
+      {/* Mobile Bet Slip Modal */}
+      {isMobileBetSlipOpen && (
+        <BetSlip
+          selectedBets={selectedBets}
+          onRemoveBet={handleRemoveBet}
+          onClearBets={handleClearBets}
+          myBets={myBets}
+          user={user}
+          onBetPlaced={fetchInitialData}
+          onCashout={handleCashout}
+          isMobile={true}
+          onClose={() => setIsMobileBetSlipOpen(false)}
+        />
+      )}
+
+      {/* Persistent Mobile Bottom Navigation Bar */}
+      <nav className="lg:hidden sticky bottom-0 z-40 bg-[#080d14]/95 backdrop-blur-md border-t border-[#1a2d40] px-2 py-1.5 flex items-center justify-around shadow-2xl">
+        <button
+          onClick={() => {
+            setActiveTab('sports');
+            setFilterMode('all');
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+            activeTab === 'sports'
+              ? 'text-cyan-400 font-extrabold scale-105'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Trophy className="w-4 h-4 mb-0.5" />
+          <span className="text-[10px] font-bold">Sports</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('live');
+            setFilterMode('live');
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+            activeTab === 'live'
+              ? 'text-cyan-400 font-extrabold scale-105'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <div className="relative">
+            <Activity className="w-4 h-4 mb-0.5" />
+            <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+            <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
+          </div>
+          <span className="text-[10px] font-bold">Live</span>
+        </button>
+
+        {/* Casino - Big & Prominently Highlighted */}
+        <button
+          onClick={() => setActiveTab('casino')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all relative ${
+            activeTab === 'casino'
+              ? 'bg-gradient-to-r from-amber-500/25 to-yellow-500/25 text-amber-400 font-black border border-amber-500/50 shadow-lg shadow-amber-500/20 scale-105'
+              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+          }`}
+        >
+          <span className="text-base leading-none">🎰</span>
+          <span className="text-[10px] font-black tracking-wider text-amber-300">CASINO</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crash')}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
+            activeTab === 'crash'
+              ? 'text-cyan-400 font-extrabold scale-105'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          <Plane className="w-4 h-4 mb-0.5" />
+          <span className="text-[10px] font-bold">Aviator</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (!user) {
+              setAuthMode('login');
+              setIsAuthOpen(true);
+            } else {
+              setIsWalletOpen(true);
+            }
+          }}
+          className="flex flex-col items-center justify-center py-1 px-2 rounded-xl text-emerald-400 hover:text-emerald-300 transition-all"
+        >
+          <Wallet className="w-4 h-4 mb-0.5" />
+          <span className="text-[10px] font-bold">Cashier</span>
+        </button>
+
+        <button
+          onClick={() => setIsMobileBetSlipOpen(true)}
+          className="relative flex flex-col items-center justify-center py-1 px-2 rounded-xl text-gray-400 hover:text-white transition-all"
+        >
+          <Layers className="w-4 h-4 mb-0.5" />
+          {selectedBets.length > 0 && (
+            <span className="absolute top-0.5 right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 text-black text-[9px] font-black flex items-center justify-center">
+              {selectedBets.length}
+            </span>
+          )}
+          <span className="text-[10px] font-bold">Slip</span>
+        </button>
+      </nav>
 
       {/* Wallet Deposit/Withdrawal Modal */}
       <WalletModal

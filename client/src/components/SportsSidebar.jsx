@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Trophy, 
   Flame, 
@@ -7,7 +7,10 @@ import {
   Calendar, 
   Star,
   Search,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft,
+  Filter,
+  X
 } from 'lucide-react';
 
 export default function SportsSidebar({ 
@@ -17,8 +20,14 @@ export default function SportsSidebar({
   setFilterMode,
   searchQuery,
   setSearchQuery,
-  matches = []
+  matches = [],
+  isCollapsed: externalIsCollapsed,
+  setIsCollapsed: externalSetIsCollapsed
 }) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = externalIsCollapsed !== undefined ? externalIsCollapsed : internalCollapsed;
+  const setIsCollapsed = externalSetIsCollapsed !== undefined ? externalSetIsCollapsed : setInternalCollapsed;
+
   const sports = [
     { id: 'all', name: 'All Sports', icon: '🌐', count: matches.length },
     { id: 'cricket', name: 'Cricket', icon: '🏏', count: matches.filter(m => m.sport === 'cricket').length, isHot: true },
@@ -37,8 +46,78 @@ export default function SportsSidebar({
     { name: 'Grand Slam Championship', sport: 'tennis', flag: '🏆' }
   ];
 
+  // When MINIMIZED / COLLAPSED to side:
+  if (isCollapsed) {
+    return (
+      <aside className="w-11 sm:w-12 bg-[#0d1622] border-r border-[#1a2b3d] flex flex-col items-center py-3 select-none h-[calc(100vh-64px)] sticky top-16 z-20 shrink-0 transition-all duration-300">
+        {/* Expand Arrow Button */}
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-black border border-cyan-500/40 flex items-center justify-center transition-all shadow-lg active:scale-95 group mb-4"
+          title="Expand Matches & Sports Sidebar"
+        >
+          <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+
+        {/* Quick Sports Icon Strip */}
+        <div className="flex flex-col items-center space-y-3 text-sm">
+          {sports.slice(0, 5).map((sport) => (
+            <button
+              key={sport.id}
+              onClick={() => {
+                setSelectedSport(sport.id);
+                setIsCollapsed(false);
+              }}
+              className={`p-1.5 rounded-lg text-sm hover:bg-[#152332] transition-transform hover:scale-110 ${
+                selectedSport === sport.id ? 'bg-cyan-500/20 ring-1 ring-cyan-400' : ''
+              }`}
+              title={`${sport.name} (${sport.count})`}
+            >
+              {sport.icon}
+            </button>
+          ))}
+        </div>
+
+        {/* Rotated Vertical Label */}
+        <div className="flex-1 flex items-center justify-center py-6">
+          <span className="text-[10px] font-black tracking-widest text-cyan-400/70 uppercase [writing-mode:vertical-rl] rotate-180 select-none">
+            {filterMode === 'live' ? '🔴 LIVE' : 'MATCHES'}
+          </span>
+        </div>
+
+        {/* Bottom Expand Trigger */}
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="text-gray-400 hover:text-cyan-300 p-1.5 rounded-lg hover:bg-[#152332] transition-colors"
+          title="Click to expand"
+        >
+          <Filter className="w-4 h-4" />
+        </button>
+      </aside>
+    );
+  }
+
+  // When FULLY EXPANDED:
   return (
-    <aside className="w-64 bg-[#0d1622] border-r border-[#1a2b3d] flex flex-col h-[calc(100vh-64px)] sticky top-16 select-none">
+    <aside className="w-64 bg-[#0d1622] border-r border-[#1a2b3d] flex flex-col h-[calc(100vh-64px)] sticky top-16 select-none z-20 shrink-0 transition-all duration-300">
+      {/* Minimize Header Bar with Arrow */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#182737] bg-[#09111b]">
+        <span className="text-xs font-black text-white font-gaming tracking-wide flex items-center space-x-1.5">
+          <Trophy className="w-4 h-4 text-cyan-400" />
+          <span>SPORTS & MATCHES</span>
+        </span>
+        
+        {/* Minimize Arrow Button */}
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-[#142334] hover:bg-[#1c334d] text-cyan-400 hover:text-cyan-200 border border-cyan-500/30 text-[11px] font-extrabold transition-all shadow-sm active:scale-95"
+          title="Minimize sidebar to side"
+        >
+          <span>Hide</span>
+          <ChevronLeft className="w-3.5 h-3.5 text-cyan-400" />
+        </button>
+      </div>
+
       {/* Search match input */}
       <div className="p-3 border-b border-[#182737]">
         <div className="relative">
@@ -52,13 +131,13 @@ export default function SportsSidebar({
           />
         </div>
 
-        {/* Filter Pills */}
+        {/* Filter Pills (All Matches / Live Only) */}
         <div className="grid grid-cols-2 gap-1.5 mt-2.5">
           <button
             onClick={() => setFilterMode('all')}
-            className={`text-xs py-1 px-2 rounded-md font-medium transition-all ${
+            className={`text-xs py-1.5 px-2 rounded-md font-bold transition-all ${
               filterMode === 'all'
-                ? 'bg-cyan-600 text-white font-semibold'
+                ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-600/30'
                 : 'bg-[#152332] text-gray-400 hover:text-white'
             }`}
           >
@@ -66,9 +145,9 @@ export default function SportsSidebar({
           </button>
           <button
             onClick={() => setFilterMode('live')}
-            className={`text-xs py-1 px-2 rounded-md font-medium transition-all flex items-center justify-center space-x-1 ${
+            className={`text-xs py-1.5 px-2 rounded-md font-bold transition-all flex items-center justify-center space-x-1 ${
               filterMode === 'live'
-                ? 'bg-red-600 text-white font-semibold shadow-md shadow-red-600/30'
+                ? 'bg-red-600 text-white font-bold shadow-md shadow-red-600/30'
                 : 'bg-[#152332] text-gray-400 hover:text-white'
             }`}
           >
